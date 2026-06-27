@@ -14,7 +14,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-MYSQL_CONFIG = {"host": "localhost", "marzban": "root", "database": "marzban"}
+MYSQL_CONFIG = {"host": "localhost", "user": "marzban", "database": "marzban"}
 SQLITE_PATH = "/var/lib/marzban/db.sqlite3"
 TABLES = ["users", "jwt", "admins"]
 OUTPUT_FILE = "marzban.json"
