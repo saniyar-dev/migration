@@ -1,10 +1,32 @@
 import asyncio
-import secrets
 
 from pathlib import Path
 from app.importer.utils import helpers, logger, config, MarzneshinClient
 from app.importer.models import ServiceCreate, AdminCreate, AdminUpdate
-from collections import defaultdict
+
+STANDARD_SERVICE_NAME = "standard"
+
+
+async def get_or_create_standard_service(api: MarzneshinClient, inbound_ids: list[int]) -> int | None:
+    existing = await api.list_services()
+    if existing and existing.items:
+        for service in existing.items:
+            if service.name == STANDARD_SERVICE_NAME:
+                logger.info(f"Reusing existing '{STANDARD_SERVICE_NAME}' service (id={service.id})")
+                return service.id
+
+    logger.info(f"Creating '{STANDARD_SERVICE_NAME}' service...")
+    service = await api.create_service(
+        ServiceCreate(
+            name=STANDARD_SERVICE_NAME,
+            inbound_ids=inbound_ids,
+        )
+    )
+    if not service:
+        logger.error(f"Failed to create '{STANDARD_SERVICE_NAME}' service")
+        return None
+    logger.info(f"Created '{STANDARD_SERVICE_NAME}' service (id={service.id})")
+    return service.id
 
 
 async def main():
@@ -20,8 +42,6 @@ async def main():
         logger.error("Failed to read marzban.json")
         return None
 
-    services_by_admin = defaultdict(list)
-
     async with MarzneshinClient() as api:
         logger.info("Checking admin sudo access...")
         sudo_check = await api.login(
@@ -33,10 +53,16 @@ async def main():
 
         logger.info("Checking available inbounds...")
         inbounds = await api.get_inbounds()
-        if not inbounds:
+        if not inbounds or not inbounds.items:
             logger.error(
                 "No inbounds found! Please add at least one inbound before migration."
             )
+            return
+
+        standard_service_id = await get_or_create_standard_service(
+            api, [inbound.id for inbound in inbounds.items]
+        )
+        if not standard_service_id:
             return
 
         logger.info(f"Starting admin migration process for {len(admins)} admins...")
@@ -48,19 +74,6 @@ async def main():
                 )
 
                 try:
-                    logger.info(f"Creating service for {admin.username}...")
-                    service = await api.create_service(
-                        ServiceCreate(
-                            name=f"{admin.username}{secrets.token_hex(2)}",
-                            inbound_ids=[inbounds.items[0].id],
-                        )
-                    )
-                    if not service:
-                        logger.error(f"Failed to create service for '{admin.username}'")
-                        continue
-
-                    logger.info("Service created successfully")
-
                     check_admin = await api.get_admin(admin.username)
 
                     if not check_admin:
@@ -69,7 +82,8 @@ async def main():
                             AdminCreate(
                                 username=admin.username,
                                 password=f"{admin.username}{admin.username}",
-                                service_ids=[service.id],
+                                service_ids=[standard_service_id],
+                                all_services_access=True,
                             )
                         )
                     else:
@@ -82,7 +96,8 @@ async def main():
                             AdminUpdate(
                                 username=admin.username,
                                 password=f"{admin.username}{admin.username}",
-                                service_ids=[service.id],
+                                service_ids=[standard_service_id],
+                                all_services_access=True,
                             )
                         )
 
@@ -92,7 +107,6 @@ async def main():
                         )
                         continue
 
-                    services_by_admin[admin_account.username] = service.id
                     logger.info(f"Successfully processed admin: {admin.username}")
                     success = True
                     break
@@ -112,12 +126,6 @@ async def main():
 
         logger.info("Starting user migration process...")
         for admin, users in users_by_admin.items():
-            if admin not in services_by_admin:
-                logger.error(
-                    f"Skipping users for admin {admin} due to failed admin creation"
-                )
-                continue
-
             logger.info(f"Processing users for admin: {admin} ({len(users)} users)")
 
             async with MarzneshinClient() as api:
@@ -127,13 +135,11 @@ async def main():
                     logger.error(f"Failed to login as admin: {admin}")
                     continue
 
-                admin_service = services_by_admin.get(admin)
-
                 for user in users:
                     logger.info(f"Processing user: {user.username}")
 
                     try:
-                        new_user = helpers.parse_marz_user(user, admin_service)
+                        new_user = helpers.parse_marz_user(user, standard_service_id)
                         created_user = await api.create_user(new_user)
                         if not created_user:
                             logger.error(f"Failed to create user: {user.username}")

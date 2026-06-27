@@ -14,6 +14,7 @@ from ..models import (
     UserData,
     Inbounds,
     AdminUpdate,
+    Services,
 )
 
 T = TypeVar("T", bound=BaseModel)
@@ -121,6 +122,13 @@ class MarzneshinClient:
             method="GET",
             endpoint=f"/api/services/{service_id}",
             response_model=ServiceData,
+        )
+
+    async def list_services(self) -> Optional[Services]:
+        return await self._make_request(
+            method="GET",
+            endpoint="/api/services",
+            response_model=Services,
         )
 
     async def create_user(self, user: UserCreate) -> Optional[UserData]:

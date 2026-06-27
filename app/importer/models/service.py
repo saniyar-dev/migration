@@ -52,3 +52,11 @@ class Inbounds(BaseModel):
     page: int
     size: int
     links: dict
+
+
+class Services(BaseModel):
+    items: list[ServiceData]
+    total: int
+    page: int
+    size: int
+    links: dict

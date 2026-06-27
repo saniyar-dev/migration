@@ -1,5 +1,5 @@
 from .admin import AdminCreate, AdminData, AdminToken, MarzAdminData, AdminUpdate
-from .service import ServiceCreate, ServiceData, Inbound, Node, Inbounds
+from .service import ServiceCreate, ServiceData, Inbound, Node, Inbounds, Services
 from .user import (
     UserCreate,
     UserData,
@@ -19,6 +19,7 @@ __all__ = [
     Inbound,
     Node,
     Inbounds,
+    Services,
     UserCreate,
     UserData,
     UserDataUsageResetStrategy,
