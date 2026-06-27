@@ -92,14 +92,12 @@ MARZBAN_USERS_DATA="marzban.json"
 cd /root/migration && uv sync &&  uv run import.py
 ```
 
-3. **Save exceptions.json file to your pc**
+3. **Delete docker map files**
 
-4. **Delete docker map files**
-   
-   After the import is complete, delete the Docker map files in volume. and `marzneshin restart` 
+   After the import is complete, delete the Docker map files in volume. and `marzneshin restart`
 
 
-5. **Delete script Files**
+4. **Delete script Files**
 
 ```bash
 rm -rf /root/migration

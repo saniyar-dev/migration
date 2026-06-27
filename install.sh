@@ -10,8 +10,6 @@ readonly INSTALL_DIR="/opt/erfjab"
 readonly BRANCH="master"
 readonly USERNAME="erfjab"
 
-readonly SERVICE_FILE="/etc/systemd/system/${SCRIPT_NAME}.service"
-readonly SERVICE_NAME="${SCRIPT_NAME}.service"
 readonly REPO_URL="https://github.com/${USERNAME}/${SCRIPT_NAME}.git"
 readonly SCRIPT_URL="https://raw.githubusercontent.com/${USERNAME}/${SCRIPT_NAME}/${BRANCH}/install.sh"
 readonly LOG_FILE_ADDRESS="${INSTALL_DIR}/${SCRIPT_NAME}/${SCRIPT_NAME}.log"

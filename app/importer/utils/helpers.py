@@ -1,7 +1,9 @@
 import json
 import pytz
 import re
-import hashlib
+import secrets
+from base64 import b64encode
+from hashlib import sha256
 
 from functools import lru_cache
 from pathlib import Path
@@ -16,52 +18,38 @@ USERNAME_REGEXP = r"^\w{3,32}$"
 
 
 @lru_cache(maxsize=1)
-def get_exceptions_list():
-    with open("exceptions.json", "r") as file:
-        usernames = json.load(file)
-    return usernames
-
-
-def find_duplicates(username: str):
-    lowercase_usernames = list(map(str.lower, username))
-    duplicates = [
-        item for item in lowercase_usernames if lowercase_usernames.count(item) > 1
-    ]
-    return list(set(duplicates))
-
-
-def make_exceptions_list(json_file: str | Path = config.MARZBAN_USERS_DATA):
+def _load_jwt_secret(json_file: str | Path = config.MARZBAN_USERS_DATA) -> Optional[str]:
     try:
         file_path = Path(json_file)
-
         if not file_path.exists():
             logger.error(f"Marzban data file not found at: {file_path}")
             return None
-
         with file_path.open(encoding="utf-8") as file:
-            data: Dict[str, List[dict]] = json.load(file)
-
-        usernames = [user.get("username") for user in data["users"]]
-        dup = find_duplicates(usernames)
-        exceptions = []
-
-        for username in usernames:
-            # Replace '-' with '_' and check the regex pattern
-            modified_u = username.replace("-", "_")
-            is_valid_format = re.fullmatch(USERNAME_REGEXP, modified_u)
-            is_not_duplicate = username.lower() not in dup
-            is_unique_or_same = (
-                modified_u not in usernames if modified_u != username else True
-            )
-            if not (is_valid_format and is_not_duplicate and is_unique_or_same):
-                exceptions.append(username)
-
-        with open("exceptions.json", "w") as file:
-            json.dump(exceptions, file)
-        return True
+            data = json.load(file)
+        jwt_entries = data.get("jwt") or []
+        if not jwt_entries:
+            logger.error("No 'jwt' entries found in Marzban data")
+            return None
+        return jwt_entries[0].get("secret_key")
     except Exception as e:
-        logger.error(e)
-    return False
+        logger.error(f"Error loading JWT secret: {e}")
+        return None
+
+
+def make_marzban_token(username: str, jwt_secret: str) -> str:
+    """
+    Generate a Marzban-compatible subscription token.
+
+    Format (matches Marzban's `create_subscription_token` in
+    `Marzban/app/utils/jwt.py:47-57`):
+        b64url(username,unix_ts) + b64url(sha256(token + secret))[:10]
+    """
+    data = f"{username},{int(datetime.utcnow().timestamp())}"
+    data_b64 = b64encode(data.encode("utf-8"), altchars=b"-_").decode("utf-8").rstrip("=")
+    sig = b64encode(
+        sha256((data_b64 + jwt_secret).encode("utf-8")).digest(), altchars=b"-_"
+    ).decode("utf-8")[:10]
+    return data_b64 + sig
 
 
 def gen_key(uuid: str) -> str:
@@ -141,17 +129,12 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
         else None
     )
 
-    username = old.username
-    if username in get_exceptions_list():
-        clean = re.sub(r"[^\w]", "", username.lower())
-        hash_str = str(
-            int(hashlib.md5(username.encode()).hexdigest(), 16) % 10000
-        ).zfill(4)
-        username = f"{clean}_{hash_str}"[:32]
-    else:
-        username = (username.lower()).replace("-", "_")
+    username = old.username.lower().replace("-", "_")
 
     key = gen_key(old.uuid) if old.uuid is not None else None
+
+    jwt_secret = _load_jwt_secret()
+    sub_token = make_marzban_token(old.username, jwt_secret) if jwt_secret else None
 
     return UserCreate(
         username=username,
@@ -178,4 +161,5 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
         created_at=old.created_at.isoformat() if old.created_at else None,
         sub_revoked_at=old.sub_revoked_at.isoformat() if old.sub_revoked_at else None,
         key=key,
+        sub_token=sub_token,
     )

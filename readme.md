@@ -3,11 +3,15 @@
 
 # Migration Tool
 
-A tool to migrate from **Marzban** to **Marzneshin** in three simple steps:
+A tool to migrate from **Marzban** to **Marzneshin** in two simple steps:
 
 1. [Data Export](app/export/readme.md)
 2. [Data Import](app/importer/readme.md)
-3. [Subscription Handling](app/handler/readme.md)
+
+> Subscription links are migrated automatically: every user is created with a
+> Marzban-compatible opaque token (signed using the JWT secret from
+> `marzban.json`), so existing subscription URLs continue to work against
+> Marzneshin without any bridge service.
 
 > **Note:** Our intention is not to disrespect the hard work of anyone. This project is designed for individuals who, for any reason, need to migrate. I appreciate the efforts of both the Marzban and Marzneshin teams and wish them success. 🤝
 

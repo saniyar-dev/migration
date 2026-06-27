@@ -37,6 +37,7 @@ class UserCreate(BaseModel):
     sub_revoked_at: Optional[str]
     created_at: str
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
+    sub_token: Optional[str] = None
 
     @field_validator("key", mode="before")
     def set_default_if_none(cls, value):

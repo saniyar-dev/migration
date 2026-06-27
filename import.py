@@ -155,8 +155,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    action = helpers.make_exceptions_list("marzban.json")
-    if not action:
-        logger.error("Failed to make exceptions list")
-    else:
-        asyncio.run(main())
+    asyncio.run(main())
