@@ -29,40 +29,8 @@ cd && git clone https://github.com/erfjab/migration.git && cd migration
 
 ### Configure Marzneshin
 
-Edit the Marzneshin Docker configuration to include these volumes:
-
-```
-nano /etc/opt/marzneshin/docker-compose.yml
-```
-
-**for v0.6.0 to v0.6.2:**
-
-```yaml
-    volumes:
-      - /var/lib/marzneshin:/var/lib/marzneshin
-      - /root/migration/app/importer/docker/v062/user.py:/app/app/models/user.py
-      - /root/migration/app/importer/docker/v062/crud.py:/app/app/db/crud.py
-```
-
-
-**for v0.6.3 to v0.6.4:**
-
-```yaml
-    volumes:
-      - /var/lib/marzneshin:/var/lib/marzneshin
-      - /root/migration/app/importer/docker/v063/user.py:/app/app/models/user.py
-      - /root/migration/app/importer/docker/v063/crud.py:/app/app/db/crud.py
-```
-
-**for v0.7.0 to v0.7.2:**
-
-```yaml
-    volumes:
-      - /var/lib/marzneshin:/var/lib/marzneshin
-      - /root/migration/app/importer/docker/v070/user.py:/app/app/models/user.py
-      - /root/migration/app/importer/docker/v070/crud.py:/app/app/db/crud.py
-```
-
+Ensure Marzneshin is built from a checkout that includes the `sub_token`
+migration (`20260628_a1b2c3d4e5f6`). No docker volume overrides are required.
 
 Restart Marzneshin to apply changes:
 
@@ -92,12 +60,7 @@ MARZBAN_USERS_DATA="marzban.json"
 cd /root/migration && uv sync &&  uv run import.py
 ```
 
-3. **Delete docker map files**
-
-   After the import is complete, delete the Docker map files in volume. and `marzneshin restart`
-
-
-4. **Delete script Files**
+3. **Delete script Files**
 
 ```bash
 rm -rf /root/migration
