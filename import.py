@@ -42,6 +42,22 @@ async def main():
         logger.error("Failed to read marzban.json")
         return None
 
+    all_users = [u for users in users_by_admin.values() for u in users]
+    sanitized_counts: dict[str, int] = {}
+    for u in all_users:
+        s = helpers._sanitize_username(u.username)
+        sanitized_counts[s] = sanitized_counts.get(s, 0) + 1
+
+    disambiguation_map: dict[str, str] = {}
+    seen: dict[str, int] = {}
+    for u in all_users:
+        sanitized = helpers._sanitize_username(u.username)
+        if sanitized_counts[sanitized] > 1:
+            seen[sanitized] = seen.get(sanitized, 0) + 1
+            disambiguation_map[u.username] = str(seen[sanitized])
+        else:
+            disambiguation_map[u.username] = ""
+
     async with MarzneshinClient() as api:
         logger.info("Checking admin sudo access...")
         sudo_check = await api.login(
@@ -139,7 +155,14 @@ async def main():
                     logger.info(f"Processing user: {user.username}")
 
                     try:
-                        new_user = helpers.parse_marz_user(user, standard_service_id)
+                        disambiguation = disambiguation_map.get(
+                            user.username, ""
+                        )
+                        new_user = helpers.parse_marz_user(
+                            user,
+                            standard_service_id,
+                            username_disambiguation=disambiguation,
+                        )
                         created_user = await api.create_user(new_user)
                         if not created_user:
                             logger.error(f"Failed to create user: {user.username}")

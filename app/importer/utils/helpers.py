@@ -2,8 +2,6 @@ import json
 import pytz
 import re
 import secrets
-from base64 import b64encode
-from hashlib import sha256
 
 from functools import lru_cache
 from pathlib import Path
@@ -15,41 +13,6 @@ from . import config, logger
 from ..models import MarzAdminData, MarzUserData, UserCreate, UserExpireStrategy
 
 USERNAME_REGEXP = r"^\w{3,32}$"
-
-
-@lru_cache(maxsize=1)
-def _load_jwt_secret(json_file: str | Path = config.MARZBAN_USERS_DATA) -> Optional[str]:
-    try:
-        file_path = Path(json_file)
-        if not file_path.exists():
-            logger.error(f"Marzban data file not found at: {file_path}")
-            return None
-        with file_path.open(encoding="utf-8") as file:
-            data = json.load(file)
-        jwt_entries = data.get("jwt") or []
-        if not jwt_entries:
-            logger.error("No 'jwt' entries found in Marzban data")
-            return None
-        return jwt_entries[0].get("secret_key")
-    except Exception as e:
-        logger.error(f"Error loading JWT secret: {e}")
-        return None
-
-
-def make_marzban_token(username: str, jwt_secret: str) -> str:
-    """
-    Generate a Marzban-compatible subscription token.
-
-    Format (matches Marzban's `create_subscription_token` in
-    `Marzban/app/utils/jwt.py:47-57`):
-        b64url(username,unix_ts) + b64url(sha256(token + secret))[:10]
-    """
-    data = f"{username},{int(datetime.utcnow().timestamp())}"
-    data_b64 = b64encode(data.encode("utf-8"), altchars=b"-_").decode("utf-8").rstrip("=")
-    sig = b64encode(
-        sha256((data_b64 + jwt_secret).encode("utf-8")).digest(), altchars=b"-_"
-    ).decode("utf-8")[:10]
-    return data_b64 + sig
 
 
 def gen_key(uuid: str) -> str:
@@ -113,7 +76,22 @@ def parse_marzban_data(
         return None
 
 
-def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
+def _sanitize_username(raw: str) -> str:
+    """
+    Sanitize a Marzban username to fit Marzneshin's `^\w{3,32}$`
+    regex (a-z, 0-9, underscore, 3-32 chars). Strips invalid
+    characters and lowercases. Used purely for display/lookup
+    inside Marzneshin's API — the original `marzban_username` is
+    preserved separately so /sub/{token} requests can still be
+    resolved.
+    """
+    cleaned = re.sub(r"[^\w]", "", raw.lower().replace("-", "_"))
+    return cleaned[:32] if len(cleaned) >= 3 else (cleaned + "___")[:32]
+
+
+def parse_marz_user(
+    old: MarzUserData, service: int, username_disambiguation: str = ""
+) -> UserCreate:
     if old.data_limit:
         remaining_data = old.data_limit - old.used_traffic
         data_limit = 1024 * 1024 if remaining_data <= 0 else remaining_data
@@ -129,12 +107,11 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
         else None
     )
 
-    username = old.username.lower().replace("-", "_")
+    username = _sanitize_username(old.username)
+    if username_disambiguation:
+        username = f"{username[: 32 - len(username_disambiguation)]}_{username_disambiguation}"
 
     key = gen_key(old.uuid) if old.uuid is not None else None
-
-    jwt_secret = _load_jwt_secret()
-    sub_token = make_marzban_token(old.username, jwt_secret) if jwt_secret else None
 
     return UserCreate(
         username=username,
@@ -161,5 +138,5 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
         created_at=old.created_at.isoformat() if old.created_at else None,
         sub_revoked_at=old.sub_revoked_at.isoformat() if old.sub_revoked_at else None,
         key=key,
-        sub_token=sub_token,
+        marzban_username=old.username,
     )
