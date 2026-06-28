@@ -12,6 +12,7 @@ class AdminCreate(BaseModel):
     all_services_access: bool = False
     modify_users_access: bool = False
     subscription_url_prefix: Optional[str] = ""
+    hashed_password: Optional[str] = None
 
 
 class AdminUpdate(BaseModel):
@@ -23,6 +24,7 @@ class AdminUpdate(BaseModel):
     all_services_access: Optional[bool] = None
     modify_users_access: Optional[bool] = None
     subscription_url_prefix: Optional[str] = None
+    hashed_password: Optional[str] = None
 
 
 class AdminData(BaseModel):

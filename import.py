@@ -92,6 +92,16 @@ async def main():
                 try:
                     check_admin = await api.get_admin(admin.username)
 
+                    # Marzban's `hashed_password` is a bcrypt hash; Marzneshin
+                    # uses the same scheme so we can copy it verbatim and the
+                    # admin's existing plaintext password keeps working.
+                    # Skip for placeholder admins (e.g. the synthetic "bear"
+                    # admin) whose `hashed_password` is not a real bcrypt hash.
+                    marz_hash = admin.hashed_password
+                    looks_like_bcrypt = isinstance(marz_hash, str) and marz_hash.startswith(
+                        ("$2a$", "$2b$", "$2y$")
+                    )
+
                     if not check_admin:
                         logger.info(f"Creating new admin account: {admin.username}")
                         admin_account = await api.create_admin(
@@ -100,6 +110,7 @@ async def main():
                                 password=f"{admin.username}{admin.username}",
                                 service_ids=[standard_service_id],
                                 all_services_access=True,
+                                hashed_password=marz_hash if looks_like_bcrypt else None,
                             )
                         )
                     else:
@@ -114,6 +125,7 @@ async def main():
                                 password=f"{admin.username}{admin.username}",
                                 service_ids=[standard_service_id],
                                 all_services_access=True,
+                                hashed_password=marz_hash if looks_like_bcrypt else None,
                             )
                         )
 
