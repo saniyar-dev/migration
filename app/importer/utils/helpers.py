@@ -92,11 +92,12 @@ def _sanitize_username(raw: str) -> str:
 def parse_marz_user(
     old: MarzUserData, service: int, username_disambiguation: str = ""
 ) -> UserCreate:
-    if old.data_limit:
-        remaining_data = old.data_limit - old.used_traffic
-        data_limit = 1024 * 1024 if remaining_data <= 0 else remaining_data
-    else:
-        data_limit = 0
+    # Pass `data_limit` as the FULL cap (not remaining). Marzneshin's
+    # dashboard computes `remaining = data_limit - used_traffic`, so
+    # setting both to the original values keeps the math correct
+    # (e.g. cap=10GB, used=3GB → remaining=7GB).
+    # Pass `None` for unlimited (Marzban's `data_limit=None`).
+    data_limit = old.data_limit
 
     tehran_tz = pytz.timezone("Asia/Tehran")
     expire_date = (
@@ -139,4 +140,6 @@ def parse_marz_user(
         sub_revoked_at=old.sub_revoked_at.isoformat() if old.sub_revoked_at else None,
         key=key,
         marzban_username=old.username,
+        used_traffic=old.used_traffic,
+        lifetime_used_traffic=old.used_traffic,
     )

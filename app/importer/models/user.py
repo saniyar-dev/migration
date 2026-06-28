@@ -26,7 +26,7 @@ class UserExpireStrategy(str, Enum):
 
 class UserCreate(BaseModel):
     activation_deadline: Optional[str]
-    data_limit: int
+    data_limit: Optional[int] = None
     data_limit_reset_strategy: UserDataUsageResetStrategy
     expire_strategy: UserExpireStrategy
     expire_date: Optional[str]
@@ -38,6 +38,8 @@ class UserCreate(BaseModel):
     created_at: str
     key: str = Field(default_factory=lambda: secrets.token_hex(16))
     marzban_username: Optional[str] = None
+    used_traffic: int = 0
+    lifetime_used_traffic: int = 0
 
     @field_validator("key", mode="before")
     def set_default_if_none(cls, value):
